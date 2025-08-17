@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Sri Lanka Vehicle Information Scraper{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Left Column - Input Form -->
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-search me-2"></i>
+                    Vehicle Information Scraper
+                </h4>
+            </div>
+            <div class="card-body">
+                <form id="scrapingForm" enctype="multipart/form-data">
+                    <!-- Session Configuration -->
+                    <div class="mb-4">
+                        <h5 class="text-primary">
+                            <i class="fas fa-key me-2"></i>
+                            Session Configuration
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="session_id" class="form-label">
+                                        Session ID (JSESSIONID) <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="text" class="form-control" id="session_id" name="session_id" required>
+                                    <div class="form-text">
+                                        Get this from your browser's cookies after logging into the vehicle info website.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button type="button" class="btn btn-outline-secondary d-block w-100" id="validateSessionBtn">
+                                        <i class="fas fa-check-circle me-1"></i>Validate
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vehicle Input Method -->
+                    <div class="mb-4">
+                        <h5 class="text-primary">
+                            <i class="fas fa-list me-2"></i>
+                            Vehicle Numbers
+                        </h5>
+                        
+                        <div class="mb-3">
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="vehicle_input_method" id="manual_input" value="manual" checked>
+                                <label class="btn btn-outline-primary" for="manual_input">
+                                    <i class="fas fa-keyboard me-1"></i>Manual Input
+                                </label>
+
+                                <input type="radio" class="btn-check" name="vehicle_input_method" id="file_input" value="file">
+                                <label class="btn btn-outline-primary" for="file_input">
+                                    <i class="fas fa-file-upload me-1"></i>Upload File
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Manual Input -->
+                        <div id="manual_input_section">
+                            <div class="mb-3">
+                                <label for="manual_vehicles" class="form-label">Vehicle Numbers</label>
+                                <textarea class="form-control" id="manual_vehicles" name="manual_vehicles" rows="6" 
+                                          placeholder="Enter vehicle numbers (one per line or comma-separated)&#10;Example:&#10;ABC-1234&#10;DEF-5678&#10;GHI-9012"></textarea>
+                                <div class="form-text">
+                                    Enter vehicle numbers separated by new lines or commas.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- File Input -->
+                        <div id="file_input_section" style="display: none;">
+                            <div class="mb-3">
+                                <label for="vehicle_file" class="form-label">Upload Vehicle Numbers File</label>
+                                <input type="file" class="form-control" id="vehicle_file" name="vehicle_file" accept=".csv,.txt">
+                                <div class="form-text">
+                                    Upload a CSV or TXT file containing vehicle numbers.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Scraper Configuration -->
+                    <div class="mb-4">
+                        <h5 class="text-primary">
+                            <i class="fas fa-cogs me-2"></i>
+                            Scraper Configuration
+                        </h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="max_workers" class="form-label">Max Concurrent Threads</label>
+                                    <select class="form-select" id="max_workers" name="max_workers">
+                                        <option value="1">1 (Slowest, Safest)</option>
+                                        <option value="2">2</option>
+                                        <option value="3" selected>3 (Recommended)</option>
+                                        <option value="4">4</option>
+                                        <option value="5">5 (Fastest, Riskier)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="delay" class="form-label">Delay Between Requests (seconds)</label>
+                                    <select class="form-select" id="delay" name="delay">
+                                        <option value="0.5">0.5</option>
+                                        <option value="1.0">1.0</option>
+                                        <option value="2.0" selected>2.0 (Recommended)</option>
+                                        <option value="3.0">3.0</option>
+                                        <option value="5.0">5.0</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="nic" class="form-label">NIC Number</label>
+                                    <input type="text" class="form-control" id="nic" name="nic" value="2200000000">
+                                    <div class="form-text">Fixed NIC number for requests.</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="contact" class="form-label">Contact Number</label>
+                                    <input type="text" class="form-control" id="contact" name="contact" value="0777777777">
+                                    <div class="form-text">Fixed contact number for requests.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg" id="startScrapingBtn">
+                            <i class="fas fa-play me-2"></i>
+                            Start Scraping
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column - Progress and Info -->
+    <div class="col-lg-4">
+        <!-- Progress Section -->
+        <div class="card shadow mb-4" id="progressCard" style="display: none;">
+            <div class="card-header bg-success text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-spinner fa-spin me-2"></i>
+                    Scraping Progress
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Progress</span>
+                        <span id="progressText">0/0</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar" id="progressBar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <strong>Current Vehicle:</strong>
+                    <div id="currentVehicle" class="text-muted">-</div>
+                </div>
+
+                <div class="mb-3">
+                    <strong>Estimated Time Remaining:</strong>
+                    <div id="timeRemaining" class="text-muted">Calculating...</div>
+                </div>
+
+                <div class="mb-3">
+                    <strong>Results:</strong>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <span class="badge bg-success fs-6" id="successCount">0</span><br>
+                            <small>Success</small>
+                        </div>
+                        <div class="col-6">
+                            <span class="badge bg-danger fs-6" id="failureCount">0</span><br>
+                            <small>Failed</small>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-danger btn-sm w-100" id="cancelScrapingBtn">
+                    <i class="fas fa-stop me-1"></i>Cancel Scraping
+                </button>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="card shadow">
+            <div class="card-header bg-info text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Instructions
+                </h5>
+            </div>
+            <div class="card-body">
+                <h6>How to get Session ID:</h6>
+                <ol class="small">
+                    <li>Open your browser and visit the Sri Lanka Motor Traffic Department website</li>
+                    <li>Login or authenticate if required</li>
+                    <li>Open Developer Tools (F12)</li>
+                    <li>Go to Application/Storage → Cookies</li>
+                    <li>Find and copy the JSESSIONID value</li>
+                </ol>
+
+                <h6 class="mt-3">Vehicle Number Formats:</h6>
+                <ul class="small">
+                    <li>ABC-1234 (Standard format)</li>
+                    <li>12-3456 (Old format)</li>
+                    <li>One per line or comma-separated</li>
+                </ul>
+
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Important:</strong> Use this tool responsibly and ensure you have permission to access the data.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Handle input method switching
+document.querySelectorAll('input[name="vehicle_input_method"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        if (this.value === 'manual') {
+            document.getElementById('manual_input_section').style.display = 'block';
+            document.getElementById('file_input_section').style.display = 'none';
+            document.getElementById('manual_vehicles').required = true;
+            document.getElementById('vehicle_file').required = false;
+        } else {
+            document.getElementById('manual_input_section').style.display = 'none';
+            document.getElementById('file_input_section').style.display = 'block';
+            document.getElementById('manual_vehicles').required = false;
+            document.getElementById('vehicle_file').required = true;
+        }
+    });
+});
+
+// Session validation
+document.getElementById('validateSessionBtn').addEventListener('click', async function() {
+    const sessionId = document.getElementById('session_id').value.trim();
+    if (!sessionId) {
+        alert('Please enter a session ID first.');
+        return;
+    }
+
+    const button = this;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Validating...';
+    button.disabled = true;
+
+    try {
+        const response = await fetch('/api/validate_session', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ session_id: sessionId })
+        });
+
+        const result = await response.json();
+        
+        if (result.valid) {
+            button.innerHTML = '<i class="fas fa-check me-1"></i>Valid';
+            button.className = 'btn btn-success d-block w-100';
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.className = 'btn btn-outline-secondary d-block w-100';
+            }, 3000);
+        } else {
+            button.innerHTML = '<i class="fas fa-times me-1"></i>Invalid';
+            button.className = 'btn btn-danger d-block w-100';
+            alert('Session validation failed: ' + result.message);
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.className = 'btn btn-outline-secondary d-block w-100';
+            }, 3000);
+        }
+    } catch (error) {
+        button.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>Error';
+        button.className = 'btn btn-warning d-block w-100';
+        alert('Validation error: ' + error.message);
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.className = 'btn btn-outline-secondary d-block w-100';
+        }, 3000);
+    } finally {
+        button.disabled = false;
+    }
+});
+
+// Form submission and progress tracking
+document.getElementById('scrapingForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const submitBtn = document.getElementById('startScrapingBtn');
+    
+    // Disable form
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Starting...';
+    
+    try {
+        const response = await fetch('/start_scraping', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            // Show progress card
+            document.getElementById('progressCard').style.display = 'block';
+            
+            // Start progress polling
+            startProgressPolling();
+            
+            // Update button
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Scraping...';
+        } else {
+            alert('Error: ' + result.error);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-play me-2"></i>Start Scraping';
+        }
+    } catch (error) {
+        alert('Error starting scraping: ' + error.message);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-play me-2"></i>Start Scraping';
+    }
+});
+
+function startProgressPolling() {
+    if (progressInterval) {
+        clearInterval(progressInterval);
+    }
+    progressInterval = setInterval(async () => {
+        try {
+            const response = await fetch('/progress');
+            const status = await response.json();
+            
+            updateProgressDisplay(status);
+            
+            if (!status.is_running) {
+                if (progressInterval) {
+                    clearInterval(progressInterval);
+                    progressInterval = null;
+                }
+                onScrapingComplete(status);
+            }
+        } catch (error) {
+            console.error('Error fetching progress:', error);
+        }
+    }, 1000);
+}
+
+function updateProgressDisplay(status) {
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const currentVehicle = document.getElementById('currentVehicle');
+    const timeRemaining = document.getElementById('timeRemaining');
+    const successCount = document.getElementById('successCount');
+    const failureCount = document.getElementById('failureCount');
+    
+    const progress = status.total > 0 ? (status.progress / status.total) * 100 : 0;
+    
+    progressBar.style.width = progress + '%';
+    progressText.textContent = `${status.progress}/${status.total}`;
+    currentVehicle.textContent = status.current_vehicle || '-';
+    
+    if (status.estimated_time_remaining) {
+        const minutes = Math.floor(status.estimated_time_remaining / 60);
+        const seconds = Math.floor(status.estimated_time_remaining % 60);
+        timeRemaining.textContent = `${minutes}m ${seconds}s`;
+    } else {
+        timeRemaining.textContent = 'Calculating...';
+    }
+    
+    const successful = status.results ? status.results.filter(r => r.status === 'success').length : 0;
+    const failed = status.results ? status.results.length - successful : 0;
+    
+    successCount.textContent = successful;
+    failureCount.textContent = failed;
+}
+
+function onScrapingComplete(status) {
+    const submitBtn = document.getElementById('startScrapingBtn');
+    
+    if (status.completed) {
+        submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>Completed';
+        submitBtn.className = 'btn btn-success btn-lg';
+        
+        // Redirect to results page
+        setTimeout(() => {
+            window.location.href = '/results';
+        }, 2000);
+    } else {
+        submitBtn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Failed';
+        submitBtn.className = 'btn btn-warning btn-lg';
+        
+        if (status.error) {
+            alert('Scraping failed: ' + status.error);
+        }
+        
+        setTimeout(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-play me-2"></i>Start Scraping';
+            submitBtn.className = 'btn btn-primary btn-lg';
+        }, 3000);
+    }
+}
+
+// Cancel scraping
+document.getElementById('cancelScrapingBtn').addEventListener('click', async function() {
+    if (confirm('Are you sure you want to cancel the scraping process?')) {
+        try {
+            const response = await fetch('/cancel_scraping', {
+                method: 'POST'
+            });
+            
+            const result = await response.json();
+            alert(result.message);
+            
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+            
+            // Reset UI
+            const submitBtn = document.getElementById('startScrapingBtn');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-play me-2"></i>Start Scraping';
+            submitBtn.className = 'btn btn-primary btn-lg';
+            
+            document.getElementById('progressCard').style.display = 'none';
+        } catch (error) {
+            alert('Error cancelling scraping: ' + error.message);
+        }
+    }
+});
+</script>
+{% endblock %}

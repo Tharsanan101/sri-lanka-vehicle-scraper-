@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+
+{% block title %}Results - Sri Lanka Vehicle Information Scraper{% endblock %}
+
+{% block extra_head %}
+<style>
+    .results-summary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    .result-card {
+        transition: transform 0.2s;
+    }
+    .result-card:hover {
+        transform: translateY(-2px);
+    }
+    .vehicle-number {
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+        font-size: 1.1em;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    {% if status.completed or status.results %}
+    <!-- Results Summary -->
+    <div class="results-summary text-center">
+        <h2 class="mb-4">
+            <i class="fas fa-chart-line me-3"></i>
+            Scraping Results
+        </h2>
+        
+        <div class="row">
+            <div class="col-md-3">
+                <h3 class="display-6">{{ status.total or 0 }}</h3>
+                <p class="mb-0">Total Vehicles</p>
+            </div>
+            <div class="col-md-3">
+                <h3 class="display-6 text-success">{{ (status.results | selectattr('status', 'equalto', 'success') | list | length) if status.results else 0 }}</h3>
+                <p class="mb-0">Successful</p>
+            </div>
+            <div class="col-md-3">
+                <h3 class="display-6 text-warning">{{ (status.results | rejectattr('status', 'equalto', 'success') | list | length) if status.results else 0 }}</h3>
+                <p class="mb-0">Failed</p>
+            </div>
+            <div class="col-md-3">
+                <h3 class="display-6">
+                    {{ "%.1f"|format(((status.results | selectattr('status', 'equalto', 'success') | list | length) / (status.results | length) * 100) if status.results and status.results|length > 0 else 0) }}%
+                </h3>
+                <p class="mb-0">Success Rate</p>
+            </div>
+        </div>
+        
+        {% if status.start_time %}
+        <div class="mt-3">
+            <small>
+                <i class="fas fa-clock me-1"></i>
+                Started: {{ status.start_time | timestamp_to_datetime if status.start_time else "Unknown" }}
+                {% if not status.is_running and status.results %}
+                | Duration: {{ ((status.results[-1].timestamp | parse_datetime) - (status.start_time | timestamp_to_datetime)).total_seconds() | duration_format if status.results and status.start_time else "Unknown" }}
+                {% endif %}
+            </small>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Download Section -->
+    {% if status.completed and (status.csv_file or status.json_file) %}
+    <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-download me-2"></i>
+                Download Results
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% if status.csv_file %}
+                <div class="col-md-4">
+                    <a href="{{ url_for('download_file', filename=status.csv_file) }}" class="btn btn-success btn-lg w-100 mb-2">
+                        <i class="fas fa-file-csv me-2"></i>
+                        Download CSV
+                    </a>
+                </div>
+                {% endif %}
+                
+                {% if status.json_file %}
+                <div class="col-md-4">
+                    <a href="{{ url_for('download_file', filename=status.json_file) }}" class="btn btn-info btn-lg w-100 mb-2">
+                        <i class="fas fa-file-code me-2"></i>
+                        Download JSON
+                    </a>
+                </div>
+                {% endif %}
+                
+                <div class="col-md-4">
+                    <a href="{{ url_for('download_all_results') }}" class="btn btn-primary btn-lg w-100 mb-2">
+                        <i class="fas fa-file-archive me-2"></i>
+                        Download All (ZIP)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Filter and Search -->
+    {% if status.results %}
+    <div class="card shadow mb-4">
+        <div class="card-header">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list me-2"></i>
+                        Detailed Results
+                    </h5>
+                </div>
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search by vehicle number, make, model...">
+                        <select class="form-select" id="statusFilter" style="max-width: 150px;">
+                            <option value="">All Status</option>
+                            <option value="success">Success Only</option>
+                            <option value="failed">Failed Only</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Vehicle Number</th>
+                            <th>Status</th>
+                            <th>Make & Model</th>
+                            <th>Year</th>
+                            <th>Engine Number</th>
+                            <th>Vehicle Class</th>
+                            <th>Owner/Mortgage</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsTableBody">
+                        {% for result in status.results %}
+                        <tr class="result-row" 
+                            data-vehicle="{{ result.vehicle_number }}" 
+                            data-status="{{ result.status }}"
+                            data-make="{{ result.make or '' }}"
+                            data-model="{{ result.model or '' }}">
+                            <td>
+                                <span class="vehicle-number">{{ result.vehicle_number }}</span>
+                            </td>
+                            <td>
+                                {% if result.status == 'success' %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i>Success
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-times me-1"></i>Failed
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if result.status == 'success' %}
+                                    {{ result.make }} {{ result.model }}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if result.status == 'success' and result.year_of_manufacture %}
+                                    {{ result.year_of_manufacture }}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if result.status == 'success' and result.engine_number %}
+                                    <small class="font-monospace">{{ result.engine_number }}</small>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if result.status == 'success' and result.vehicle_class %}
+                                    <small>{{ result.vehicle_class }}</small>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if result.status == 'success' and result.name_of_ownership %}
+                                    <small>{{ result.name_of_ownership[:30] }}{% if result.name_of_ownership|length > 30 %}...{% endif %}</small>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="showResultDetails('{{ loop.index0 }}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% elif status.is_running %}
+    <!-- Currently Running -->
+    <div class="text-center py-5">
+        <div class="card shadow">
+            <div class="card-body">
+                <i class="fas fa-spinner fa-spin fa-3x text-primary mb-3"></i>
+                <h3>Scraping in Progress</h3>
+                <p class="text-muted">Your scraping job is currently running. Please wait for it to complete.</p>
+                <p><strong>Progress:</strong> {{ status.progress }}/{{ status.total }}</p>
+                <div class="progress mb-3">
+                    <div class="progress-bar" style="width: {{ (status.progress / status.total * 100) if status.total > 0 else 0 }}%"></div>
+                </div>
+                <a href="{{ url_for('home') }}" class="btn btn-primary">
+                    <i class="fas fa-arrow-left me-2"></i>
+                    Back to Home
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- No Results -->
+    <div class="text-center py-5">
+        <div class="card shadow">
+            <div class="card-body">
+                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                <h3>No Results Available</h3>
+                <p class="text-muted">No scraping results found. Start a new scraping job to see results here.</p>
+                <a href="{{ url_for('home') }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>
+                    Start New Scraping
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Result Details Modal -->
+<div class="modal fade" id="resultDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-car me-2"></i>
+                    Vehicle Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="resultDetailsBody">
+                <!-- Details will be populated by JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Store results data for JavaScript access
+const resultsData = {{ status.results | tojson if status.results else '[]' }};
+
+// Search and filter functionality
+document.getElementById('searchInput').addEventListener('input', filterResults);
+document.getElementById('statusFilter').addEventListener('change', filterResults);
+
+function filterResults() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const statusFilter = document.getElementById('statusFilter').value;
+    const rows = document.querySelectorAll('.result-row');
+    
+    rows.forEach(row => {
+        const vehicleNumber = row.dataset.vehicle.toLowerCase();
+        const status = row.dataset.status;
+        const make = row.dataset.make.toLowerCase();
+        const model = row.dataset.model.toLowerCase();
+        
+        const matchesSearch = vehicleNumber.includes(searchTerm) || 
+                            make.includes(searchTerm) || 
+                            model.includes(searchTerm);
+        
+        const matchesStatus = !statusFilter || status === statusFilter;
+        
+        if (matchesSearch && matchesStatus) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// Show result details in modal
+function showResultDetails(index) {
+    const result = resultsData[index];
+    if (!result) return;
+    
+    const modalBody = document.getElementById('resultDetailsBody');
+    
+    let detailsHtml = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6 class="text-primary">Basic Information</h6>
+                <table class="table table-sm">
+                    <tr><td><strong>Vehicle Number:</strong></td><td class="vehicle-number">${result.vehicle_number}</td></tr>
+                    <tr><td><strong>Status:</strong></td><td>
+                        ${result.status === 'success' 
+                            ? '<span class="badge bg-success"><i class="fas fa-check me-1"></i>Success</span>' 
+                            : '<span class="badge bg-danger"><i class="fas fa-times me-1"></i>Failed</span>'}
+                    </td></tr>
+                    <tr><td><strong>Report Date:</strong></td><td>${result.report_date || '-'}</td></tr>
+                    <tr><td><strong>Timestamp:</strong></td><td>${new Date(result.timestamp).toLocaleString()}</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6 class="text-primary">Vehicle Details</h6>
+                <table class="table table-sm">
+                    <tr><td><strong>Make:</strong></td><td>${result.make || '-'}</td></tr>
+                    <tr><td><strong>Model:</strong></td><td>${result.model || '-'}</td></tr>
+                    <tr><td><strong>Year:</strong></td><td>${result.year_of_manufacture || '-'}</td></tr>
+                    <tr><td><strong>Engine Number:</strong></td><td class="font-monospace">${result.engine_number || '-'}</td></tr>
+                </table>
+            </div>
+        </div>
+        
+        <div class="row mt-3">
+            <div class="col-12">
+                <h6 class="text-primary">Additional Information</h6>
+                <table class="table table-sm">
+                    <tr><td><strong>Vehicle Class:</strong></td><td>${result.vehicle_class || '-'}</td></tr>
+                    <tr><td><strong>Owner/Mortgage:</strong></td><td>${result.name_of_ownership || '-'}</td></tr>
+                    <tr><td><strong>Conditions & Notes:</strong></td><td>${result.conditions_and_notes || '-'}</td></tr>
+                </table>
+            </div>
+        </div>
+    `;
+    
+    if (result.status !== 'success' && result.error) {
+        detailsHtml += `
+            <div class="row mt-3">
+                <div class="col-12">
+                    <h6 class="text-danger">Error Information</h6>
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${result.error}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    modalBody.innerHTML = detailsHtml;
+    
+    // Show modal
+    new bootstrap.Modal(document.getElementById('resultDetailsModal')).show();
+}
+
+// Auto-refresh if scraping is still running
+{% if status.is_running %}
+setTimeout(() => {
+    window.location.reload();
+}, 5000);
+{% endif %}
+</script>
+{% endblock %}
